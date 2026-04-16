@@ -10,7 +10,6 @@ const WP_BASE_URL = (process.env.WP_BASE_URL ?? "").replace(/\/$/, "");
 const WP_USERNAME = process.env.WP_USERNAME ?? "";
 const WP_APP_PASSWORD = process.env.WP_APP_PASSWORD ?? "";
 const MCP_API_TOKEN = process.env.MCP_API_TOKEN ?? "";
-const FORWARD_WEBHOOK_URL = process.env.FORWARD_WEBHOOK_URL ?? "";
 
 function authHeader(): string {
   const credentials = Buffer.from(`${WP_USERNAME}:${WP_APP_PASSWORD}`).toString("base64");
@@ -343,17 +342,6 @@ app.post("/webhook", (req: Request, res: Response) => {
     if (submissions.length > MAX_SUBMISSIONS) submissions.splice(MAX_SUBMISSIONS);
 
     console.log(`Webhook received: ${submission.form_name} — ${JSON.stringify(fields)}`);
-
-    // Forward to original webhook URL if configured
-    if (FORWARD_WEBHOOK_URL) {
-      fetch(FORWARD_WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      })
-        .then(() => console.log(`Forwarded to: ${FORWARD_WEBHOOK_URL}`))
-        .catch(err => console.error(`Forward failed: ${err}`));
-    }
 
     res.json({ success: true, id: submission.id });
   } catch (err) {
