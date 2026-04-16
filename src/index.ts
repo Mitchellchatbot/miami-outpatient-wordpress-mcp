@@ -44,6 +44,21 @@ async function wpRequest(
   return text ? JSON.parse(text) : null;
 }
 
+
+// ─── Elementor field ID → human label map ────────────────────────────────────
+const FIELD_LABELS: Record<string, string> = {
+  "email":          "First Name",
+  "field_357e341":  "Last Name",
+  "field_e99ca9e":  "Email",
+  "field_07f0796":  "Insurance Provider",
+  "field_e806566":  "Member ID/Policy Number",
+  "field_6a07350":  "Date of Birth",
+};
+
+function resolveFieldLabel(key: string): string {
+  return FIELD_LABELS[key] ?? key;
+}
+
 // ─── Webhook submission store (in-memory) ────────────────────────────────────
 
 interface Submission {
@@ -320,7 +335,8 @@ app.post("/webhook", (req: Request, res: Response) => {
     // Format 2: fields is an array [{id, title, value}]
     else if (Array.isArray(body.fields)) {
       for (const f of body.fields as Array<Record<string, unknown>>) {
-        const key = String(f.title ?? f.label ?? f.id ?? "field");
+        const rawKey = String(f.id ?? "");
+        const key = resolveFieldLabel(rawKey) !== rawKey ? resolveFieldLabel(rawKey) : String(f.title ?? f.label ?? f.id ?? "field");
         fields[key] = String(f.value ?? "");
       }
     }
@@ -329,14 +345,22 @@ app.post("/webhook", (req: Request, res: Response) => {
       const metaKeys = new Set(["form_id", "form_name", "referer", "page_url", "queried_id", "element_id", "actions", "ip", "referrer", "remote_ip", "submitted_on"]);
       for (const [key, val] of Object.entries(body)) {
         if (!metaKeys.has(key) && key !== "fields") {
-          fields[key] = typeof val === "object" ? JSON.stringify(val) : String(val ?? "");
+          const label = resolveFieldLabel(key);
+          fields[label] = typeof val === "object" ? JSON.stringify(val) : String(val ?? "");
         }
       }
     }
 
-    // Form name
+    // Form name — map known form IDs to readable names
+    const FORM_NAMES: Record<string, string> = {
+      "f82804c": "Contact Form",
+    };
+    const rawFormId = String(body.form_id ?? "");
     const formName =
-      String(body.form_name ?? body["form-name"] ?? body.form_id ?? "").trim() || "Unknown Form";
+      FORM_NAMES[rawFormId] ||
+      String(body.form_name ?? body["form-name"] ?? "").trim() ||
+      rawFormId ||
+      "Unknown Form";
 
     // Page URL
     const pageUrl = String(body.referer ?? body.page_url ?? body.referrer ?? "");
