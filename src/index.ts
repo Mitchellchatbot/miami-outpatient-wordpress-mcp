@@ -344,7 +344,7 @@ app.post("/webhook", async (req: Request, res: Response) => {
       for (const [key, val] of Object.entries(body.fields as Record<string, unknown>)) {
         if (val && typeof val === "object") {
           const obj = val as Record<string, unknown>;
-          fields[String(obj.label ?? resolveFieldLabel(key))] = String(obj.value ?? "");
+          fields[String(obj.title ?? obj.label ?? resolveFieldLabel(key))] = String(obj.value ?? "");
         } else {
           fields[resolveFieldLabel(key)] = String(val ?? "");
         }
@@ -366,9 +366,22 @@ app.post("/webhook", async (req: Request, res: Response) => {
       }
     }
 
-    const rawFormId = String(body.form_id ?? "");
-    const formName = FORM_NAMES[rawFormId] || String(body.form_name ?? body["form-name"] ?? "").trim() || rawFormId || "Unknown Form";
-    const pageUrl = String(body.referer ?? body.page_url ?? body.referrer ?? "");
+    // Extract form name — Elementor sends as body.form.name
+    const formObj = body.form as Record<string, unknown> | undefined;
+    const rawFormId = String(formObj?.id ?? body.form_id ?? "");
+    const formName =
+      String(formObj?.name ?? "").trim() ||
+      FORM_NAMES[rawFormId] ||
+      String(body.form_name ?? body["form-name"] ?? "").trim() ||
+      rawFormId ||
+      "Unknown Form";
+
+    // Extract page URL — Elementor sends as body.meta.page_url.value
+    const metaObj = body.meta as Record<string, unknown> | undefined;
+    const pageUrlObj = metaObj?.page_url as Record<string, unknown> | undefined;
+    const pageUrl =
+      String(pageUrlObj?.value ?? "").trim() ||
+      String(body.referer ?? body.page_url ?? body.referrer ?? "");
 
     const submission: Submission = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
